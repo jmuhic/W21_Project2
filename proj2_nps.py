@@ -210,10 +210,11 @@ def get_site_instance(site_url):
         phone = phone.text.strip("\n")
 
         siteInstance = NationalSite(name, address, zipcode, phone, category)
+        # since site instance doesn't already exist, add to cache file
+        add_to_cache(site_url, siteInstance.toDict())
     else:
         siteInstance = NationalSite(siteInstance['name'], siteInstance['address'], siteInstance['zipcode'], siteInstance['phone'], siteInstance['category'])
 
-    add_to_cache(site_url, siteInstance.toDict())
     return siteInstance
 
 def get_sites_for_state(state_url):
@@ -296,9 +297,6 @@ def print_results(userState, userStateURL):
     count = 0
     listSites = get_sites_for_state(userStateURL)
 
-    # for site in listSites:
-    #     print("Fetching")
-
     results = []
     for site in listSites:
         #formatSiteList.append(get_site_instance(site).info())
@@ -312,7 +310,6 @@ def print_results(userState, userStateURL):
     print(40 * '-')
 
     for i in results:
-        #print("[{0}] {1}".format(count,site_inst.info()))
         print("[{0}] {1}".format(i[0],i[1].info()))
     print("\n")
 
@@ -351,32 +348,32 @@ def add_to_cache(key, value):
     --------
     None
     '''
+    # creating key,value pair for cache file
     json_cache[key] = value
 
+    # writing new key,value pair to cache file
     with open("cache.json", "w") as cache:
         json.dump(json_cache, cache)
 
 
 if __name__ == "__main__":
+    # initializing cache and path
     json_cache = {}
     path = 'cache.json'
+
+    # if the cache file exist, read from that file
     if os.path.isfile(path):
         with open('cache.json') as f:
             json_cache = json.load(f)
+
+    # initializing StateDict for user search in next step
     stateDict = {}
     stateDict = build_state_url_dict()
 
+    # Allow user to enter a state (full name) - not case sensitive
     userState = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
-    userState = userState.lower()
-    userStateURL = stateDict[userState]
 
-    print_results(userState, userStateURL)
-
-
-
-
-    #testPart2 = get_site_instance('https://www.nps.gov/isro/index.htm')
-    #testPart2 = get_site_instance('https://www.nps.gov/yell/index.htm')
-    #print(testPart2.info())
-
-    # PART 3 TESTING
+    # Take user's input and produce a list of results
+    userState = userState.lower()  # not case sensitive
+    userStateURL = stateDict[userState]  # grab StateURL from stateDict
+    print_results(userState, userStateURL)  # print results from user's search

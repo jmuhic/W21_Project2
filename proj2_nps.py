@@ -1,6 +1,6 @@
 #################################
-##### Name:
-##### Uniqname:
+##### Name: Jana Muhic
+##### Uniqname: jmuhic
 #################################
 
 from bs4 import BeautifulSoup
@@ -99,7 +99,7 @@ def build_state_url_dict():
             if state.text:
                 dict[state.text.lower()] = 'https://www.nps.gov' + state['href']
 
-    add_to_cache('dict', dict)
+        add_to_cache('dict', dict)
     return dict  # will return cached dict if found
 
 def get_site_instance_alt(site_url):
@@ -199,21 +199,37 @@ def get_site_instance(site_url):
         # Reassigning names for more clear Return
         name = name.text
         category = category.text
-        address = ""
-        if city != None and state != None and zipcode != None:
+        #address = ""
+        # if city != None and state != None and zipcode != None:
+        #     address = city.text + ", " + state.text
+        #     zipcode = zipcode.text
+        # else:
+        #     city = ""
+        #     state = ""
+        #     zipcode = ""
+        # phone = phone.text.strip("\n")
+
+        if city != None and state != None:
             address = city.text + ", " + state.text
-            zipcode = zipcode.text
         else:
-            city = ""
-            state = ""
+            address = ""
+
+        if zipcode != None:
+            zipcode = zipcode.text.rstrip()
+        else:
             zipcode = ""
-        phone = phone.text.strip("\n")
+
+        if phone != None:
+            phone = phone.text.strip("\n")
+        else:
+            phone = ""
 
         siteInstance = NationalSite(name, address, zipcode, phone, category)
         # since site instance doesn't already exist, add to cache file
         add_to_cache(site_url, siteInstance.toDict())
     else:
         siteInstance = NationalSite(siteInstance['name'], siteInstance['address'], siteInstance['zipcode'], siteInstance['phone'], siteInstance['category'])
+
 
     return siteInstance
 
@@ -232,6 +248,7 @@ def get_sites_for_state(state_url):
     '''
     # Set list to populate and URLs to build from
     list = []
+    site_inst_list = []
     list = check_cache(state_url)
 
     if list is None:
@@ -256,9 +273,14 @@ def get_sites_for_state(state_url):
             tempURL = temp['href']
             list.append(baseURL + tempURL + indexURL)
 
-    #print(list)
-    add_to_cache(state_url, list)
-    return list
+        add_to_cache(state_url, list)
+
+    for item in list:
+        site_inst_list.append(get_site_instance(item))
+
+    return site_inst_list
+    #return list
+
 
     ### Created a test file to double check the html import/parsing ###
     # fileTest3 = open("testFileStateParks.txt", "w")
@@ -279,7 +301,97 @@ def get_nearby_places(site_object):
     dict
         a converted API return from MapQuest API
     '''
-    pass
+    mapkey = secrets.MAPQUEST_API_KEY
+    mapZip = site_object.zipcode
+    map_baseurl = 'http://www.mapquestapi.com/search/v2/radius?'
+
+    # list_loc = {
+    #     'name' : [],
+    #     'category' : [],
+    #     'address' : [],
+    #     'city' : []
+    # }
+
+    params = {
+        'radius' : '10',
+        'key' : mapkey,
+        'maxMatches' : '10',
+        'origin' : mapZip,
+        'ambiguities' : 'ignore',
+        'outFormat' : 'json'
+    }
+
+    output = requests.get(map_baseurl, params=params)
+    results = json.loads(output.text)
+
+    # for location in results['searchResults']:
+    #     list_loc['name'].append(location['name'])
+    #     if location['fields']['address'] == '':
+    #         list_loc['address'].append('no address')
+    #     else:
+    #         list_loc['address'].append(location['fields']['address'])
+    #     if location['fields']['group_sic_code_name_ext'] == '':
+    #         list_loc['category'].append('no category')
+    #     else:
+    #         list_loc['category'].append(location['fields']['group_sic_code_name_ext'])
+    #     if location['fields']['city'] == '':
+    #         list_loc['city'].append('no city')
+    #     else:
+    #         list_loc['city'].append(location['fields']['city'])
+
+    # # print(list_loc)
+    # # print(len(list_loc['name']))
+
+
+    # for i in range(len(list_loc['name'])):
+    #     #print("[{0}] {1}".format(i[0],i[1].info()))
+    #     print("- {0} ({1}): {2}, {3}".format(list_loc['name'][i], list_loc['category'][i],\
+    #          list_loc['address'][i], list_loc['city'][i]))
+
+    #return list_loc
+    return results
+
+def print_mapquest_results(results):
+    '''
+    Takes in the results from nearby places search (Mapquest)
+    and converts the results into a formatted print out.
+
+    Parameters:
+    -----------
+    results(dict): dict of results from Mapquest API Search
+
+    Returns:
+    --------
+    None
+    '''
+    list_loc = {
+        'name' : [],
+        'category' : [],
+        'address' : [],
+        'city' : []
+    }
+
+    for location in results['searchResults']:
+        list_loc['name'].append(location['name'])
+        if location['fields']['address'] == '':
+            list_loc['address'].append('no address')
+        else:
+            list_loc['address'].append(location['fields']['address'])
+        if location['fields']['group_sic_code_name_ext'] == '':
+            list_loc['category'].append('no category')
+        else:
+            list_loc['category'].append(location['fields']['group_sic_code_name_ext'])
+        if location['fields']['city'] == '':
+            list_loc['city'].append('no city')
+        else:
+            list_loc['city'].append(location['fields']['city'])
+
+    for i in range(len(list_loc['name'])):
+        #print("[{0}] {1}".format(i[0],i[1].info()))
+        print("- {0} ({1}): {2}, {3}".format(list_loc['name'][i], list_loc['category'][i],\
+             list_loc['address'][i], list_loc['city'][i]))
+
+
 
 def print_results(userState, userStateURL):
     '''
@@ -294,6 +406,7 @@ def print_results(userState, userStateURL):
     --------
     None
     '''
+    listSites = []
     count = 0
     listSites = get_sites_for_state(userStateURL)
 
@@ -301,7 +414,7 @@ def print_results(userState, userStateURL):
     for site in listSites:
         #formatSiteList.append(get_site_instance(site).info())
         count += 1
-        site_inst = get_site_instance(site)
+        site_inst = site
         site_inst.index = count
         results.append([site_inst.index, site_inst])
 
@@ -352,19 +465,26 @@ def add_to_cache(key, value):
     json_cache[key] = value
 
     # writing new key,value pair to cache file
-    with open("cache.json", "w") as cache:
+    with open("cache2.json", "w") as cache:
         json.dump(json_cache, cache)
 
+json_cache = {}
+path = 'cache2.json'
+
+# if the cache file exist, read from that file
+if os.path.isfile(path):
+    with open('cache2.json') as f:
+        json_cache = json.load(f)
 
 if __name__ == "__main__":
     # initializing cache and path
-    json_cache = {}
-    path = 'cache.json'
+    # json_cache = {}
+    # path = 'cache.json'
 
-    # if the cache file exist, read from that file
-    if os.path.isfile(path):
-        with open('cache.json') as f:
-            json_cache = json.load(f)
+    # # if the cache file exist, read from that file
+    # if os.path.isfile(path):
+    #     with open('cache.json') as f:
+    #         json_cache = json.load(f)
 
     # initializing StateDict for user search in next step
     stateDict = {}
@@ -377,3 +497,6 @@ if __name__ == "__main__":
     userState = userState.lower()  # not case sensitive
     userStateURL = stateDict[userState]  # grab StateURL from stateDict
     print_results(userState, userStateURL)  # print results from user's search
+
+    results = get_nearby_places(NationalSite(name='Isle Royale', address='Houghton, MI', zipcode='49931', phone='', category='National Park'))
+    print_mapquest_results(results)

@@ -301,57 +301,33 @@ def get_nearby_places(site_object):
     dict
         a converted API return from MapQuest API
     '''
-    mapkey = secrets.MAPQUEST_API_KEY
-    mapZip = site_object.zipcode
-    map_baseurl = 'http://www.mapquestapi.com/search/v2/radius?'
+    results = []
+    results = check_cache(site_object.name)
 
-    # list_loc = {
-    #     'name' : [],
-    #     'category' : [],
-    #     'address' : [],
-    #     'city' : []
-    # }
+    if results is None:
+        mapkey = secrets.MAPQUEST_API_KEY
+        mapZip = site_object.zipcode
+        map_baseurl = 'http://www.mapquestapi.com/search/v2/radius?'
 
-    params = {
-        'radius' : '10',
-        'key' : mapkey,
-        'maxMatches' : '10',
-        'origin' : mapZip,
-        'ambiguities' : 'ignore',
-        'outFormat' : 'json'
-    }
+        params = {
+            'radius' : '10',
+            'key' : mapkey,
+            'maxMatches' : '10',
+            'origin' : mapZip,
+            'ambiguities' : 'ignore',
+            'outFormat' : 'json'
+        }
 
-    output = requests.get(map_baseurl, params=params)
-    results = json.loads(output.text)
+        output = requests.get(map_baseurl, params=params)
+        results = json.loads(output.text)
 
-    # for location in results['searchResults']:
-    #     list_loc['name'].append(location['name'])
-    #     if location['fields']['address'] == '':
-    #         list_loc['address'].append('no address')
-    #     else:
-    #         list_loc['address'].append(location['fields']['address'])
-    #     if location['fields']['group_sic_code_name_ext'] == '':
-    #         list_loc['category'].append('no category')
-    #     else:
-    #         list_loc['category'].append(location['fields']['group_sic_code_name_ext'])
-    #     if location['fields']['city'] == '':
-    #         list_loc['city'].append('no city')
-    #     else:
-    #         list_loc['city'].append(location['fields']['city'])
+        add_to_cache(site_object.name, results)
 
-    # # print(list_loc)
-    # # print(len(list_loc['name']))
+    print_mapquest_results(site_object, results)
 
-
-    # for i in range(len(list_loc['name'])):
-    #     #print("[{0}] {1}".format(i[0],i[1].info()))
-    #     print("- {0} ({1}): {2}, {3}".format(list_loc['name'][i], list_loc['category'][i],\
-    #          list_loc['address'][i], list_loc['city'][i]))
-
-    #return list_loc
     return results
 
-def print_mapquest_results(results):
+def print_mapquest_results(site_object, results):
     '''
     Takes in the results from nearby places search (Mapquest)
     and converts the results into a formatted print out.
@@ -386,14 +362,17 @@ def print_mapquest_results(results):
         else:
             list_loc['city'].append(location['fields']['city'])
 
+    print(40 * '-')
+    print(f"Places near", site_object.name.title())
+    print(40 * '-')
+
     for i in range(len(list_loc['name'])):
-        #print("[{0}] {1}".format(i[0],i[1].info()))
         print("- {0} ({1}): {2}, {3}".format(list_loc['name'][i], list_loc['category'][i],\
              list_loc['address'][i], list_loc['city'][i]))
 
 
 
-def print_results(userState, userStateURL):
+def print_results_old(userState, userStateURL):
     '''
     Takes in the URL for State entered by the user.
     Returns a formatted list of the State Parks.
@@ -419,12 +398,69 @@ def print_results(userState, userStateURL):
         results.append([site_inst.index, site_inst])
 
     print(40 * '-')
-    print(f"List of National Sites in ", userState.capitalize())
+    print(f"List of National Sites in ", userState.title())
     print(40 * '-')
 
     for i in results:
         print("[{0}] {1}".format(i[0],i[1].info()))
     print("\n")
+
+def print_results(search_term, site_instance):
+    '''
+    Takes in the URL for State entered by the user.
+    Returns a formatted list of the State Parks.
+
+    Parameters:
+    -----------
+    userStateURL(URL): URL for user's selected State
+
+    Returns:
+    --------
+    None
+    '''
+
+    count = 0
+
+    results = []
+    for site in site_instance:
+        #formatSiteList.append(get_site_instance(site).info())
+        count += 1
+        site.index = count
+        results.append([site.index, site.info()])
+
+    print(40 * '-')
+    print(f"List of National Sites in ", search_term.capitalize())
+    print(40 * '-')
+
+    for i in results:
+        print("[{0}] {1}".format(i[0],i[1]))
+    print("\n")
+
+def handle_numeric(search_term, results):
+    '''
+    Handles a search with a numeric value and returns list
+    of nearby places if found
+
+    Parameter:
+    ----------
+    search_term(str): user-entered string to search
+    results(list): list of state park objects
+
+    Returns:
+    --------
+    None
+    '''
+    b_found = False
+    search_term = int(search_term)
+    if results == []:
+        print(f"Search has not yet been completed to use numeric value.")
+        return False
+    for park_obj in results:
+        if park_obj.index == search_term:
+            return(park_obj)
+            b_found = True
+    if b_found == False:
+        print(f"Search term out of range. Please try again.")
 
 
 def check_cache(key):
@@ -477,26 +513,50 @@ if os.path.isfile(path):
         json_cache = json.load(f)
 
 if __name__ == "__main__":
-    # initializing cache and path
-    # json_cache = {}
-    # path = 'cache.json'
-
-    # # if the cache file exist, read from that file
-    # if os.path.isfile(path):
-    #     with open('cache.json') as f:
-    #         json_cache = json.load(f)
-
+   ######## COMMENTED OUT BLOCK USED TO TEST ################
     # initializing StateDict for user search in next step
     stateDict = {}
     stateDict = build_state_url_dict()
 
-    # Allow user to enter a state (full name) - not case sensitive
-    userState = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
+    # # Allow user to enter a state (full name) - not case sensitive
+    # userState = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
 
-    # Take user's input and produce a list of results
-    userState = userState.lower()  # not case sensitive
-    userStateURL = stateDict[userState]  # grab StateURL from stateDict
-    print_results(userState, userStateURL)  # print results from user's search
+    # # Take user's input and produce a list of results
+    # userState = userState.lower()  # not case sensitive
+    # userStateURL = stateDict[userState]  # grab StateURL from stateDict
+    # print_results(userState, userStateURL)  # print results from user's search
 
-    results = get_nearby_places(NationalSite(name='Isle Royale', address='Houghton, MI', zipcode='49931', phone='', category='National Park'))
-    print_mapquest_results(results)
+    # results = get_nearby_places(NationalSite(name='Isle Royale', address='Houghton, MI', zipcode='49931', phone='', category='National Park'))
+    # print_mapquest_results(results)
+
+    # state_search_list = []
+    # search_term = ""
+    ############################################################
+    state_search = ""
+
+    while True:
+        try:
+            if state_search == "":  # for initial search
+                state_search = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
+                state_search = state_search.lower()
+                if state_search == 'exit':
+                    print("\n")
+                    exit()
+                else:
+                    #return list results from search
+                    state_searchURL = stateDict[state_search]
+                    results = get_sites_for_state(state_searchURL)
+                    print_results(state_search, results)
+            else:  # run if initial search has already been completed can open url
+                state_search = input("\nChoose the number for detail search or 'exit' or 'back': ")
+                if state_search.lower() == 'exit':
+                    print("\n")
+                    exit()
+                elif str.isnumeric(state_search):
+                    site_ojb_find = handle_numeric(state_search, results)
+                    nearby_results = get_nearby_places(site_ojb_find)
+                # else:
+                #     # return list results from search
+                #     ll_complete_list = handle_alpha(search_term)
+        except KeyError:
+            print("Oops! That is an invalid entry. Please make a different selection.")

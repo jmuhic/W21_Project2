@@ -476,12 +476,17 @@ if __name__ == "__main__":
                         site_ojb_find = handle_numeric(state_search, results)
                         nearby_results = get_nearby_places(site_ojb_find)
                 elif state_search.lower() == 'back':
-                   # return list results from search
+                    # return list results from search
                     state_search = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
                     state_search = state_search.lower()
-                    state_searchURL = stateDict[state_search]
-                    results = get_sites_for_state(state_searchURL)
-                    handle_alpha(state_search, results)
+                    if state_search == 'exit':
+                        print("\n")
+                        exit()
+                    else:
+                        state_search = state_search.lower()
+                        state_searchURL = stateDict[state_search]
+                        results = get_sites_for_state(state_searchURL)
+                        handle_alpha(state_search, results)
                 else:
                     print('Oops! That is an invalid entry. Please make a different selection.')
         except KeyError:

@@ -58,7 +58,8 @@ class NationalSite:
         return jsonDict
 
 def build_state_url_dict():
-    ''' Make a dictionary that maps state name to state page url from "https://www.nps.gov"
+    ''' Make a dictionary that maps state name to state page
+    url from "https://www.nps.gov"
 
     Parameters
     ----------
@@ -99,7 +100,9 @@ def build_state_url_dict():
             if state.text:
                 dict[state.text.lower()] = 'https://www.nps.gov' + state['href']
 
+        # add state url dictioary to cache for future searches
         add_to_cache('dict', dict)
+
     return dict  # will return cached dict if found
 
 
@@ -113,8 +116,8 @@ def get_site_instance(site_url):
 
     Returns
     -------
-    instance
-        a national site instance
+    siteInstance: obj
+        a national site instance (obj)
     '''
     siteInstance = check_cache(site_url)
 
@@ -130,9 +133,6 @@ def get_site_instance(site_url):
         # fileTest2.write(soup.prettify())
         # fileTest2.close()
 
-        # parkName = soup.find(class_="Hero-title")
-        # print(parkName.prettify())
-
         ### Searching through header to find name/category ###
         parkHeader = soup.find(id='HeroBanner')
         #print(parkHeader.prettify())
@@ -147,9 +147,9 @@ def get_site_instance(site_url):
         zipcode = search_footer.find(itemprop='postalCode')
         phone = search_footer.find(itemprop='telephone')
 
-        # Reassigning names for more clear Return
+        # Reassigning names.text for more understandable Return format
         name = name.text
-    
+
         # Some parks do not have a category listed; default 'no category'
         if category.text != '':
             category = category.text
@@ -175,9 +175,12 @@ def get_site_instance(site_url):
         # setting site instance (to be returned & cached)
         siteInstance = NationalSite(name, address, zipcode, phone, category)
         # since site instance doesn't already exist, add to cache file
+        # toDict converts to format that can be saved to cache
         add_to_cache(site_url, siteInstance.toDict())
-    else:
-        siteInstance = NationalSite(siteInstance['name'], siteInstance['address'], siteInstance['zipcode'], siteInstance['phone'], siteInstance['category'])
+    else: # return instance from cache
+        siteInstance = NationalSite(siteInstance['name'],\
+            siteInstance['address'], siteInstance['zipcode'],\
+            siteInstance['phone'], siteInstance['category'])
 
 
     return siteInstance  # will return cached instance if found
@@ -192,7 +195,7 @@ def get_sites_for_state(state_url):
 
     Returns
     -------
-    list
+    site_inst_list: list of objects
         a list of national site instances
     '''
     # Set list to populate and URLs to build from
@@ -242,8 +245,8 @@ def get_nearby_places(site_object):
 
     Returns
     -------
-    dict
-        a converted API return from MapQuest API
+    results: dict
+        a converted API dict return from MapQuest API
     '''
     results = []
     results = check_cache(site_object.name)
@@ -265,7 +268,7 @@ def get_nearby_places(site_object):
 
         output = requests.get(map_baseurl, params=params)
         results = json.loads(output.text)
-
+        # results added to cache
         add_to_cache(site_object.name, results)
 
     # executes print_mapquest_result function for display to user
@@ -280,7 +283,10 @@ def print_mapquest_results(site_object, results):
 
     Parameters:
     -----------
-    results(dict): dict of results from Mapquest API Search
+    site_object: object
+        NationalSite instance (obj) of selected park
+    results: dict
+        dict of results from Mapquest API Search
 
     Returns:
     --------
@@ -296,7 +302,7 @@ def print_mapquest_results(site_object, results):
     # Not all 'index' sites for parks have a listed address
     if site_object.zipcode == '':
         print('No Address Found.  Please make another selection.\n')
-    else:
+    else: # append values to list_loc dictionary (building dict)
         for location in results['searchResults']:
             list_loc['name'].append(location['name'])
             if location['fields']['address'] == '':
@@ -306,29 +312,38 @@ def print_mapquest_results(site_object, results):
             if location['fields']['group_sic_code_name_ext'] == '':
                 list_loc['category'].append('no category')
             else:
-                list_loc['category'].append(location['fields']['group_sic_code_name_ext'])
+                list_loc['category'].append(location['fields']\
+                    ['group_sic_code_name_ext'])
             if location['fields']['city'] == '':
                 list_loc['city'].append('no city')
             else:
                 list_loc['city'].append(location['fields']['city'])
 
+        # Format for header of mapquest results (nearby results)
         print(40 * '-')
         print(f"Places near", site_object.name.title())
         print(40 * '-')
 
+        # Printing nearby results in proper format
         for i in range(len(list_loc['name'])):
-            print("- {0} ({1}): {2}, {3}".format(list_loc['name'][i], list_loc['category'][i],\
-                list_loc['address'][i], list_loc['city'][i]))
+            print("- {0} ({1}): {2}, {3}".format(list_loc['name'][i],\
+                list_loc['category'][i], list_loc['address'][i],\
+                list_loc['city'][i]))
 
 
-def print_results(search_term, site_instance):
+def print_results(search_term, state_sites):
     '''
-    Takes in the URL for State entered by the user.
+    Takes in the search term entered by the user
     Returns a formatted list of the State Parks.
 
     Parameters:
     -----------
-    userStateURL(URL): URL for user's selected State
+    search_term: string
+        State entered by the user
+
+    state_sites: list
+        List of NationalSite instances for
+        the selected state
 
     Returns:
     --------
@@ -338,8 +353,10 @@ def print_results(search_term, site_instance):
 
     results = []
     printed_results = []
-    for site in site_instance:
-        #formatSiteList.append(get_site_instance(site).info())
+
+    # Assigning index value to each instance returned
+    # and adding to a list
+    for site in state_sites:
         count += 1
         site.index = count
         results.append([site.index, site.info()])
@@ -348,48 +365,54 @@ def print_results(search_term, site_instance):
     print(f"List of National Sites in", search_term.capitalize())
     print(40 * '-')
 
+    # Formatting values in results list for proper printing
     for i in results:
         printed_results.append(print("[{0}] {1}".format(i[0],i[1])))
-    print("\n")
 
     return printed_results
 
 
-def handle_alpha(search_term, site_inst):
+def handle_alpha(search_term, state_sites):
     '''
     Handles a search with an alpha (valid state string value)
 
     Parameter:
     ----------
-    search_term(str): user-entered string to search
+    search_term: str
+        State entered by the user
+
+    state_sites: list of objects
+        List of NationalSite instances for the selected state
 
     Returns:
     --------
     ret(list): list of parks for selected state
     '''
-    ret = print_results(search_term, site_inst)
+    ret = print_results(search_term, state_sites)
 
     return ret
 
 
-def handle_numeric(search_term, results):
+def handle_numeric(search_term, state_sites):
     '''
     Handles a search with a numeric value and returns list
     of nearby places if found
 
     Parameter:
     ----------
-    search_term(str): user-entered string to search
-    results(list): list of state park objects
+    search_term: string
+        user-entered index value for selected park
+    state_sites: list of objects
+        list of state park objects
 
     Returns:
     --------
-    None
+    park_obj: object
+        returns NationalSite instance of selected park
     '''
-
     search_term = int(search_term)
 
-    for park_obj in results:
+    for park_obj in state_sites:
         if park_obj.index == search_term:
             return(park_obj)
 
@@ -401,11 +424,13 @@ def check_cache(key):
 
     Parameters:
     -----------
-    key (string): key from key,value pair in cache
+    key: string
+        key from key,value pair in cache
 
     Returns:
     --------
-    value: content of key if found
+    value: string
+        content of key in dict, if found
     '''
     if key in json_cache:
         print('Using cache')
@@ -421,8 +446,11 @@ def add_to_cache(key, value):
 
     Parameters:
     -----------
-    key (string): key from key,value pair in cache
-    value: contents of key
+    key: string
+        key from key,value pair in cache
+
+    value: string
+        contents of key
 
     Returns:
     --------
@@ -435,6 +463,7 @@ def add_to_cache(key, value):
     with open("cache2.json", "w") as cache:
         json.dump(json_cache, cache)
 
+# Initializing setup of cache
 json_cache = {}
 path = 'cache2.json'
 
@@ -442,6 +471,7 @@ path = 'cache2.json'
 if os.path.isfile(path):
     with open('cache2.json') as f:
         json_cache = json.load(f)
+
 
 if __name__ == "__main__":
     # initializing StateDict for user search in While loop
@@ -452,9 +482,9 @@ if __name__ == "__main__":
     state_search = ""
 
     while True:
-        try:
-            if state_search == "":  # for initial search
-                state_search = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
+        if state_search == "":  # for initial search
+            try:
+                state_search = input("\nEnter a state name (e.g. Michigan, michigan) or 'exit': ")
                 state_search = state_search.lower()
                 if state_search == 'exit':
                     print("\n")
@@ -462,35 +492,33 @@ if __name__ == "__main__":
                 else:
                     #return list results from search
                     state_searchURL = stateDict[state_search]
-                    results = get_sites_for_state(state_searchURL)
-                    handle_alpha(state_search, results)
-            else:  # run if initial search has already been completed
+                    state_sites = get_sites_for_state(state_searchURL)
+                    handle_alpha(state_search, state_sites)
+            except KeyError:
+                state_search = ""
+                print("Oops! That is an invalid entry. Please make a different selection.")
+        else:  # run if initial search has already been completed
+            try:
                 state_search = input("\nChoose the number for detail search or 'exit' or 'back': ")
                 if state_search.lower() == 'exit':
                     print("\n")
                     exit()
                 elif str.isnumeric(state_search):  # run to find nearby places for park
-                    if (int(state_search) <= 0) or (int(state_search) > len(results)):
+                    # if numeric search selected is out of range, error
+                    if (int(state_search) <= 0)\
+                         or (int(state_search) > len(state_sites)):
                         print('Search is out of range.  Please try again.')
-                    else:
-                        site_ojb_find = handle_numeric(state_search, results)
-                        nearby_results = get_nearby_places(site_ojb_find)
+                    else:  # return list of results from mapquest, maxMatch = 10
+                        site_obj_find = handle_numeric(state_search, state_sites)
+                        nearby_results = get_nearby_places(site_obj_find)
+                # if user enters 'back', clear search value to return to Step 1
                 elif state_search.lower() == 'back':
-                    # return list results from search
-                    state_search = input("Enter a state name (e.g. Michigan, michigan) or 'exit': ")
-                    state_search = state_search.lower()
-                    if state_search == 'exit':
-                        print("\n")
-                        exit()
-                    else:
-                        state_search = state_search.lower()
-                        state_searchURL = stateDict[state_search]
-                        results = get_sites_for_state(state_searchURL)
-                        handle_alpha(state_search, results)
+                    state_search = ""
                 else:
                     print('Oops! That is an invalid entry. Please make a different selection.')
-        except KeyError:
-            print("Oops! That is an invalid entry. Please make a different selection.")
+            except KeyError:
+                print('Oops! That is an invalid entry. Please make a different selection.')
+
 
 
    ######## COMMENTED OUT BLOCK USED TO TEST ################
